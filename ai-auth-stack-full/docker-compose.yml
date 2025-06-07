@@ -1,0 +1,106 @@
+version: "3.8"
+
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - --api.dashboard=true
+      - --api.insecure=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker=true
+      - --certificatesresolvers.leresolver.acme.email=${EMAIL}
+      - --certificatesresolvers.leresolver.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.leresolver.acme.tlschallenge=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./letsencrypt:/letsencrypt
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`traefik.${DOMAIN}`)"
+      - "traefik.http.routers.api.service=api@internal"
+      - "traefik.http.routers.api.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=leresolver"
+
+  n8n:
+    image: n8nio/n8n
+    container_name: n8n
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD}
+      - N8N_HOST=n8n.${DOMAIN}
+      - N8N_PORT=5678
+    volumes:
+      - ./data/n8n:/home/node/.n8n
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN}`)"
+      - "traefik.http.routers.n8n.entrypoints=websecure"
+      - "traefik.http.routers.n8n.tls.certresolver=leresolver"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+
+  flowise:
+    image: flowiseai/flowise
+    container_name: flowise
+    environment:
+      - FLOWISE_USERNAME=${FLOWISE_USERNAME}
+      - FLOWISE_PASSWORD=${FLOWISE_PASSWORD}
+    volumes:
+      - ./data/flowise:/root/.flowise
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flow.rule=Host(`flow.${DOMAIN}`)"
+      - "traefik.http.routers.flow.entrypoints=websecure"
+      - "traefik.http.routers.flow.tls.certresolver=leresolver"
+      - "traefik.http.services.flow.loadbalancer.server.port=3000"
+
+  kratos:
+    image: oryd/kratos:v1.1.0
+    container_name: kratos
+    command: serve -c /etc/config/kratos.yaml --dev
+    volumes:
+      - ./kratos:/etc/config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kratos.rule=Host(`kratos.${DOMAIN}`)"
+      - "traefik.http.routers.kratos.entrypoints=websecure"
+      - "traefik.http.routers.kratos.tls.certresolver=leresolver"
+      - "traefik.http.services.kratos.loadbalancer.server.port=4433"
+
+  kratos-ui:
+    image: oryd/kratos-selfservice-ui-node:v1.0.0
+    container_name: kratos-ui
+    environment:
+      - KRATOS_PUBLIC_URL=http://kratos:4433
+      - KRATOS_BROWSER_URL=http://auth.${DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kratos-ui.rule=Host(`auth.${DOMAIN}`)"
+      - "traefik.http.routers.kratos-ui.entrypoints=websecure"
+      - "traefik.http.routers.kratos-ui.tls.certresolver=leresolver"
+      - "traefik.http.services.kratos-ui.loadbalancer.server.port=3000"
+
+  db:
+    image: supabase/postgres
+    container_name: supabase-db
+    environment:
+      POSTGRES_PASSWORD: ${SUPABASE_DB_PASS}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.db.rule=Host(`db.${DOMAIN}`)"
+      - "traefik.http.routers.db.entrypoints=websecure"
+      - "traefik.http.routers.db.tls.certresolver=leresolver"
+      - "traefik.http.services.db.loadbalancer.server.port=5432"
+
+networks:
+  default:
+    name: ai_stack_net

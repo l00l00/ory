@@ -1,0 +1,43 @@
+dsn: memory
+
+serve:
+  public:
+    base_url: http://kratos:4433/
+    cors:
+      enabled: true
+    port: 4433
+  admin:
+    base_url: http://kratos:4434/
+    port: 4434
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/identity.schema.json
+
+selfservice:
+  default_browser_return_url: http://auth.${DOMAIN}/
+  methods:
+    password:
+      enabled: true
+  flows:
+    login:
+      ui_url: http://auth.${DOMAIN}/login
+    registration:
+      ui_url: http://auth.${DOMAIN}/register
+    settings:
+      ui_url: http://auth.${DOMAIN}/settings
+    recovery:
+      enabled: true
+    verification:
+      enabled: false
+  ui:
+    theme_url: http://auth.${DOMAIN}/.ory/themes/default
+
+log:
+  level: debug
+
+courier:
+  smtp:
+    connection_uri: smtp://smtp.mailtrap.io:2525
