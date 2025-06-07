@@ -79,7 +79,7 @@ services:
     container_name: kratos-ui
     environment:
       - KRATOS_PUBLIC_URL=http://kratos:4433
-      - KRATOS_BROWSER_URL=http://auth.${DOMAIN}
+      - KRATOS_BROWSER_URL=https://auth.${DOMAIN}
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.kratos-ui.rule=Host(`auth.${DOMAIN}`)"
